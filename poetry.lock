@@ -1048,13 +1048,13 @@ test = ["ipykernel", "pre-commit", "pytest (<8)", "pytest-cov", "pytest-timeout"
 
 [[package]]
 name = "llama-cloud"
-version = "0.0.9"
+version = "0.0.10"
 description = ""
 optional = false
 python-versions = "<4,>=3.8"
 files = [
-    {file = "llama_cloud-0.0.9-py3-none-any.whl", hash = "sha256:3d6e6b051d63f466bee49bc8bbd03fdec658902ff20a52342d38b7824fc90759"},
-    {file = "llama_cloud-0.0.9.tar.gz", hash = "sha256:c876ac3f37b6ddf395d29c5fbc93ffc6e2d1165107cb236ec15b279e67937328"},
+    {file = "llama_cloud-0.0.10-py3-none-any.whl", hash = "sha256:87b74dcc1dd704309258e8d9fb60fddb85029250db7050637213dcceee9dd3d3"},
+    {file = "llama_cloud-0.0.10.tar.gz", hash = "sha256:d82c954b5f437881657a9cc5eb1247b8c8b7191e9615fc0537cf8a323619424e"},
 ]
 
 [package.dependencies]
@@ -2729,4 +2729,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8.1,<4.0"
-content-hash = "6266474ec3fb24019f488d979464e350b72f8fcde16e9fcd22431c79e1eb8c0d"
+content-hash = "1b3984e6cbfb40ecef4d900d4148b15a2f3ab91cecadd839401937b2def4de6a"
