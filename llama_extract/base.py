@@ -1,0 +1,263 @@
+import asyncio
+import os
+import time
+from io import BufferedIOBase, BufferedReader, BytesIO
+from json.decoder import JSONDecodeError
+from pathlib import Path
+from typing import List, Optional, Union
+import urllib.parse
+
+
+from llama_cloud import (
+    ExtractionResult,
+    ExtractionSchema,
+    File,
+    HttpValidationError,
+    StatusEnum,
+    UnprocessableEntityError,
+)
+from llama_cloud.client import AsyncLlamaCloud
+from llama_cloud.core import ApiError, jsonable_encoder
+from llama_extract.utils import nest_asyncio_err, nest_asyncio_msg
+from llama_index.core.schema import BaseComponent
+from llama_index.core.async_utils import run_jobs
+from llama_index.core.bridge.pydantic import Field, pydantic, PrivateAttr
+from llama_index.core.constants import DEFAULT_BASE_URL
+
+# can put in a path to the file or the file bytes itself
+FileInput = Union[str, Path, bytes, BufferedIOBase]
+
+
+class LlamaExtract(BaseComponent):
+    """A extractor for unstructured data."""
+
+    api_key: str = Field(description="The API key for the LlamaExtract API.")
+    base_url: str = Field(
+        description="The base URL of the LlamaExtract API.",
+    )
+    check_interval: int = Field(
+        default=1,
+        description="The interval in seconds to check if the extraction is done.",
+    )
+    max_timeout: int = Field(
+        default=2000,
+        description="The maximum timeout in seconds to wait for the extraction to finish.",
+    )
+    num_workers: int = Field(
+        default=4,
+        gt=0,
+        lt=10,
+        description="The number of workers to use sending API requests for extraction.",
+    )
+    show_progress: bool = Field(
+        default=True, description="Show progress when extracting multiple files."
+    )
+    verbose: bool = Field(
+        default=False, description="Show verbose output when extracting files."
+    )
+    _async_client: AsyncLlamaCloud = PrivateAttr()
+
+    def __init__(
+            self,
+            api_key: Optional[str] = None,
+            base_url: Optional[str] = None,
+            check_interval: int = 1,
+            max_timeout: int = 2000,
+            num_workers: int = 4,
+            show_progress: bool = True,
+            verbose: bool = False,
+        ):
+        if not api_key:
+            api_key = os.getenv("LLAMA_CLOUD_API_KEY", None)
+            if api_key is None:
+                raise ValueError("The API key is required.")
+
+        if not base_url:
+            base_url = os.getenv("LLAMA_CLOUD_BASE_URL", None) or DEFAULT_BASE_URL
+        
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url,
+            check_interval=check_interval,
+            max_timeout=max_timeout,
+            num_workers=num_workers,
+            show_progress=show_progress,
+            verbose=verbose,
+        )
+        self._async_client = AsyncLlamaCloud(
+            token=self.api_key, base_url=self.base_url, timeout=None
+        )
+
+
+    async def _upload_file(
+        self, file_input: FileInput, project_id: Optional[str] = None
+    ) -> File:
+        if isinstance(file_input, BufferedIOBase):
+            upload_file = file_input
+        elif isinstance(file_input, bytes):
+            upload_file = BytesIO(file_input)
+        elif isinstance(file_input, (str, Path)):
+            upload_file = open(file_input, "rb")
+        else:
+            raise ValueError(
+                "file_input must be either a file path string, file bytes, or buffer object"
+            )
+
+        try:
+            uploaded_file = await self._async_client.files.upload_file(
+                project_id=project_id,
+                upload_file=upload_file
+            )
+
+            return uploaded_file
+        finally:
+            if isinstance(upload_file, BufferedReader):
+                upload_file.close()
+
+    async def _get_job_result(self, job_id: str, verbose: bool = False):
+        start = time.time()
+        tries = 0
+        while True:
+            await asyncio.sleep(self.check_interval)
+            tries += 1
+            extraction_job = await self._async_client.extraction.get_job(job_id)
+
+            if extraction_job.status == StatusEnum.SUCCESS:
+                result = await self._async_client.extraction.get_job_result(job_id)
+                return result
+            elif extraction_job.status == StatusEnum.PENDING:
+                end = time.time()
+                if end - start > self.max_timeout:
+                    raise Exception(f"Timeout while extracting the file: {job_id}")
+                if verbose and tries % 10 == 0:
+                    print(".", end="", flush=True)
+
+                await asyncio.sleep(self.check_interval)
+
+                continue
+            else:
+                raise Exception(
+                    f"Failed to extract the file: {job_id}, status: {extraction_job.status}"
+                )
+
+    async def _extract(
+        self,
+        schema_id: str,
+        file_input: FileInput,
+        project_id: Optional[str] = None,
+        verbose: bool = False,
+    ) -> ExtractionResult:
+        try:
+            file = await self._upload_file(file_input, project_id)
+
+            extraction_job = await self._async_client.extraction.run_job(schema_id=schema_id, file_id=file.id)
+
+            if verbose:
+                print("Started extracting the file under job_id %s" % extraction_job.id)
+
+            result = await self._get_job_result(
+                extraction_job.id, verbose=verbose
+            )
+
+            return result
+        except Exception as e:
+            file_repr = (
+                str(file_input)
+                if isinstance(file_input, (str, Path))
+                else "<bytes/buffer>"
+            )
+            print(f"Error while extracting the file '{file_repr}':", e)
+
+            raise e
+
+    async def ainfer_schema(
+        self, name: str, seed_files: List[FileInput], project_id: Optional[str] = None
+    ) -> ExtractionSchema:
+        """Infer schema for a given set of seed files."""
+        file_ids: List[str] = []
+
+        for seed_file in seed_files:
+            file = await self._upload_file(seed_file, project_id)
+
+            file_ids.append(file.id)
+
+        body = {"name": name, "file_ids": file_ids}
+
+        # Not using extraction.infer_schema to bypass timeout
+        _response = await self._async_client._client_wrapper.httpx_client.post(
+            urllib.parse.urljoin(
+                f"{self._async_client._client_wrapper.get_base_url()}/",
+                "api/v1/extraction/schemas/infer",
+            ),
+            json=jsonable_encoder(body),
+            headers=self._async_client._client_wrapper.get_headers(),
+        )
+
+        if 200 <= _response.status_code < 300:
+            return pydantic.parse_obj_as(ExtractionSchema, _response.json())  # type: ignore
+        if _response.status_code == 422:
+            raise UnprocessableEntityError(
+                pydantic.parse_obj_as(HttpValidationError, _response.json())
+            )  # type: ignore
+        try:
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, body=_response.text)
+        raise ApiError(status_code=_response.status_code, body=_response_json)
+
+    def infer_schema(
+        self, name: str, seed_files: List[FileInput], project_id: Optional[str] = None
+    ) -> ExtractionSchema:
+        """Infer schema for a given set of seed files."""
+        try:
+            return asyncio.run(self.ainfer_schema(name, seed_files, project_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def aextract(
+        self, schema_id: str, files: List[FileInput], project_id: Optional[str] = None
+    ) -> List[ExtractionResult]:
+        """Extract data from a file using a schema."""
+
+        jobs = [
+            self._extract(
+                schema_id,
+                file,
+                project_id,
+                verbose=self.verbose and not self.show_progress,
+            )
+            for file in files
+        ]
+
+        try:
+            results = await run_jobs(
+                jobs,
+                workers=self.num_workers,
+                desc="Extracting files",
+                show_progress=self.show_progress,
+            )
+
+            return results
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    def extract(
+        self,
+        schema_id: str,
+        file_input: Union[List[FileInput], FileInput],
+        project_id: Optional[str] = None,
+    ) -> List[ExtractionResult]:
+        """Extract data from a file using a schema."""
+        try:
+            return asyncio.run(self.aextract(schema_id, file_input, project_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e

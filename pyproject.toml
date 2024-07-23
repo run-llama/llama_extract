@@ -1,0 +1,21 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "llama-extract"
+version = "0.0.1"
+description = "Infer schema and extract data from unstructured files"
+authors = ["Logan Markewich <logan@llamaindex.ai>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "llama_extract"}]
+
+[tool.poetry.dependencies]
+python = ">=3.8.1,<4.0"
+llama-index-core = ">=0.10.29"
+llama-cloud = "^0.0.9"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+ipykernel = "^6.29.0"
