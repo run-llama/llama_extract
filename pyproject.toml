@@ -19,3 +19,4 @@ llama-cloud = "^0.0.9"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 ipykernel = "^6.29.0"
+pre-commit = "3.2.0"

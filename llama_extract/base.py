@@ -58,15 +58,15 @@ class LlamaExtract(BaseComponent):
     _async_client: AsyncLlamaCloud = PrivateAttr()
 
     def __init__(
-            self,
-            api_key: Optional[str] = None,
-            base_url: Optional[str] = None,
-            check_interval: int = 1,
-            max_timeout: int = 2000,
-            num_workers: int = 4,
-            show_progress: bool = True,
-            verbose: bool = False,
-        ):
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        check_interval: int = 1,
+        max_timeout: int = 2000,
+        num_workers: int = 4,
+        show_progress: bool = True,
+        verbose: bool = False,
+    ):
         if not api_key:
             api_key = os.getenv("LLAMA_CLOUD_API_KEY", None)
             if api_key is None:
@@ -74,7 +74,7 @@ class LlamaExtract(BaseComponent):
 
         if not base_url:
             base_url = os.getenv("LLAMA_CLOUD_BASE_URL", None) or DEFAULT_BASE_URL
-        
+
         super().__init__(
             api_key=api_key,
             base_url=base_url,
@@ -87,7 +87,6 @@ class LlamaExtract(BaseComponent):
         self._async_client = AsyncLlamaCloud(
             token=self.api_key, base_url=self.base_url, timeout=None
         )
-
 
     async def _upload_file(
         self, file_input: FileInput, project_id: Optional[str] = None
@@ -105,8 +104,7 @@ class LlamaExtract(BaseComponent):
 
         try:
             uploaded_file = await self._async_client.files.upload_file(
-                project_id=project_id,
-                upload_file=upload_file
+                project_id=project_id, upload_file=upload_file
             )
 
             return uploaded_file
@@ -114,7 +112,9 @@ class LlamaExtract(BaseComponent):
             if isinstance(upload_file, BufferedReader):
                 upload_file.close()
 
-    async def _get_job_result(self, job_id: str, verbose: bool = False):
+    async def _get_job_result(
+        self, job_id: str, verbose: bool = False
+    ) -> ExtractionResult:
         start = time.time()
         tries = 0
         while True:
@@ -150,14 +150,14 @@ class LlamaExtract(BaseComponent):
         try:
             file = await self._upload_file(file_input, project_id)
 
-            extraction_job = await self._async_client.extraction.run_job(schema_id=schema_id, file_id=file.id)
+            extraction_job = await self._async_client.extraction.run_job(
+                schema_id=schema_id, file_id=file.id
+            )
 
             if verbose:
                 print("Started extracting the file under job_id %s" % extraction_job.id)
 
-            result = await self._get_job_result(
-                extraction_job.id, verbose=verbose
-            )
+            result = await self._get_job_result(extraction_job.id, verbose=verbose)
 
             return result
         except Exception as e:
@@ -250,7 +250,7 @@ class LlamaExtract(BaseComponent):
     def extract(
         self,
         schema_id: str,
-        file_input: Union[List[FileInput], FileInput],
+        file_input: List[FileInput],
         project_id: Optional[str] = None,
     ) -> List[ExtractionResult]:
         """Extract data from a file using a schema."""
