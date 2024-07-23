@@ -9,6 +9,7 @@ import urllib.parse
 
 
 from llama_cloud import (
+    ExtractionJob,
     ExtractionResult,
     ExtractionSchema,
     File,
@@ -112,7 +113,7 @@ class LlamaExtract(BaseComponent):
             if isinstance(upload_file, BufferedReader):
                 upload_file.close()
 
-    async def _get_job_result(
+    async def _wait_for_job_result(
         self, job_id: str, verbose: bool = False
     ) -> ExtractionResult:
         start = time.time()
@@ -120,10 +121,10 @@ class LlamaExtract(BaseComponent):
         while True:
             await asyncio.sleep(self.check_interval)
             tries += 1
-            extraction_job = await self._async_client.extraction.get_job(job_id)
+            extraction_job = await self.aget_job(job_id)
 
             if extraction_job.status == StatusEnum.SUCCESS:
-                result = await self._async_client.extraction.get_job_result(job_id)
+                result = await self.aget_job_result(job_id)
                 return result
             elif extraction_job.status == StatusEnum.PENDING:
                 end = time.time()
@@ -157,7 +158,7 @@ class LlamaExtract(BaseComponent):
             if verbose:
                 print("Started extracting the file under job_id %s" % extraction_job.id)
 
-            result = await self._get_job_result(extraction_job.id, verbose=verbose)
+            result = await self._wait_for_job_result(extraction_job.id, verbose=verbose)
 
             return result
         except Exception as e:
@@ -171,7 +172,11 @@ class LlamaExtract(BaseComponent):
             raise e
 
     async def ainfer_schema(
-        self, name: str, seed_files: List[FileInput], project_id: Optional[str] = None
+        self,
+        name: str,
+        seed_files: List[FileInput],
+        schema_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> ExtractionSchema:
         """Infer schema for a given set of seed files."""
         file_ids: List[str] = []
@@ -183,7 +188,13 @@ class LlamaExtract(BaseComponent):
 
         body = {"name": name, "file_ids": file_ids}
 
-        # Not using extraction.infer_schema to bypass timeout
+        if schema_id is not None:
+            body["schema_id"] = schema_id
+
+        if project_id is not None:
+            body["project_id"] = project_id
+
+        # Using httpx_client directly to bypass timeout from LlamaCloud client
         _response = await self._async_client._client_wrapper.httpx_client.post(
             urllib.parse.urljoin(
                 f"{self._async_client._client_wrapper.get_base_url()}/",
@@ -206,11 +217,117 @@ class LlamaExtract(BaseComponent):
         raise ApiError(status_code=_response.status_code, body=_response_json)
 
     def infer_schema(
-        self, name: str, seed_files: List[FileInput], project_id: Optional[str] = None
+        self,
+        name: str,
+        seed_files: List[FileInput],
+        schema_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> ExtractionSchema:
         """Infer schema for a given set of seed files."""
         try:
-            return asyncio.run(self.ainfer_schema(name, seed_files, project_id))
+            return asyncio.run(
+                self.ainfer_schema(name, seed_files, schema_id, project_id)
+            )
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def alist_schemas(
+        self, project_id: Optional[str] = None
+    ) -> List[ExtractionSchema]:
+        """List all schemas."""
+        response = await self._async_client.extraction.list_schemas(
+            project_id=project_id
+        )
+        return response.results
+
+    def list_schemas(self, project_id: Optional[str] = None) -> List[ExtractionSchema]:
+        """List all schemas."""
+        try:
+            return asyncio.run(self.alist_schemas(project_id=project_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def aget_schema(self, schema_id: str) -> ExtractionSchema:
+        """Get a schema."""
+        response = await self._async_client.extraction.get_schema(schema_id=schema_id)
+        return response
+
+    def get_schema(self, schema_id: str) -> ExtractionSchema:
+        """Get a schema."""
+        try:
+            return asyncio.run(self.aget_schema(schema_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def aupdate_schema(
+        self, schema_id: str, data_schema: Optional[dict] = None
+    ) -> ExtractionSchema:
+        """Update a schema."""
+        response = await self._async_client.extraction.update_schema(
+            schema_id=schema_id, data_schema=data_schema
+        )
+        return response
+
+    def update_schema(
+        self, schema_id: str, data_schema: Optional[dict] = None
+    ) -> ExtractionSchema:
+        """Update a schema."""
+        try:
+            return asyncio.run(self.aupdate_schema(schema_id, data_schema))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def alist_jobs(self, schema_id: str) -> List[ExtractionJob]:
+        """List all jobs."""
+        response = await self._async_client.extraction.list_jobs(schema_id=schema_id)
+        return response.results
+
+    def list_jobs(self, schema_id: str) -> List[ExtractionJob]:
+        """List all jobs."""
+        try:
+            return asyncio.run(self.alist_jobs(schema_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def aget_job(self, job_id: str) -> ExtractionJob:
+        """Get a job."""
+        response = await self._async_client.extraction.get_job(job_id=job_id)
+        return response
+
+    def get_job(self, job_id: str) -> ExtractionJob:
+        """Get a job."""
+        try:
+            return asyncio.run(self.aget_job(job_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
+    async def aget_job_result(self, job_id: str) -> ExtractionResult:
+        """Get a job result."""
+        response = await self._async_client.extraction.get_job_result(job_id=job_id)
+        return response
+
+    def get_job_result(self, job_id: str) -> ExtractionResult:
+        """Get a job result."""
+        try:
+            return asyncio.run(self.aget_job_result(job_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
