@@ -21,7 +21,7 @@ from llama_cloud.client import AsyncLlamaCloud
 from llama_cloud.core import ApiError, jsonable_encoder
 from llama_extract.utils import nest_asyncio_err, nest_asyncio_msg
 from llama_index.core.schema import BaseComponent
-from llama_index.core.async_utils import run_jobs
+from llama_index.core.async_utils import asyncio_run, run_jobs
 from llama_index.core.bridge.pydantic import Field, pydantic, PrivateAttr
 from llama_index.core.constants import DEFAULT_BASE_URL
 
@@ -225,7 +225,7 @@ class LlamaExtract(BaseComponent):
     ) -> ExtractionSchema:
         """Infer schema for a given set of seed files."""
         try:
-            return asyncio.run(
+            return asyncio_run(
                 self.ainfer_schema(name, seed_files, schema_id, project_id)
             )
         except RuntimeError as e:
@@ -246,7 +246,7 @@ class LlamaExtract(BaseComponent):
     def list_schemas(self, project_id: Optional[str] = None) -> List[ExtractionSchema]:
         """List all schemas."""
         try:
-            return asyncio.run(self.alist_schemas(project_id=project_id))
+            return asyncio_run(self.alist_schemas(project_id=project_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -261,7 +261,7 @@ class LlamaExtract(BaseComponent):
     def get_schema(self, schema_id: str) -> ExtractionSchema:
         """Get a schema."""
         try:
-            return asyncio.run(self.aget_schema(schema_id))
+            return asyncio_run(self.aget_schema(schema_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -282,7 +282,7 @@ class LlamaExtract(BaseComponent):
     ) -> ExtractionSchema:
         """Update a schema."""
         try:
-            return asyncio.run(self.aupdate_schema(schema_id, data_schema))
+            return asyncio_run(self.aupdate_schema(schema_id, data_schema))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -297,7 +297,7 @@ class LlamaExtract(BaseComponent):
     def list_jobs(self, schema_id: str) -> List[ExtractionJob]:
         """List all jobs."""
         try:
-            return asyncio.run(self.alist_jobs(schema_id))
+            return asyncio_run(self.alist_jobs(schema_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -312,7 +312,7 @@ class LlamaExtract(BaseComponent):
     def get_job(self, job_id: str) -> ExtractionJob:
         """Get a job."""
         try:
-            return asyncio.run(self.aget_job(job_id))
+            return asyncio_run(self.aget_job(job_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -327,7 +327,7 @@ class LlamaExtract(BaseComponent):
     def get_job_result(self, job_id: str) -> ExtractionResult:
         """Get a job result."""
         try:
-            return asyncio.run(self.aget_job_result(job_id))
+            return asyncio_run(self.aget_job_result(job_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -372,7 +372,7 @@ class LlamaExtract(BaseComponent):
     ) -> List[ExtractionResult]:
         """Extract data from a file using a schema."""
         try:
-            return asyncio.run(self.aextract(schema_id, file_input, project_id))
+            return asyncio_run(self.aextract(schema_id, file_input, project_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
