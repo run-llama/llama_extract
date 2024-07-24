@@ -234,14 +234,41 @@ class LlamaExtract(BaseComponent):
             else:
                 raise e
 
+    async def acreate_schema(
+        self,
+        name: str,
+        data_schema: dict,
+        project_id: Optional[str] = None,
+    ) -> ExtractionSchema:
+        """Create a schema."""
+        response = await self._async_client.extraction.create_schema(
+            name=name, data_schema=data_schema, project_id=project_id
+        )
+        return response
+
+    def create_schema(
+        self,
+        name: str,
+        data_schema: dict,
+        project_id: Optional[str] = None,
+    ) -> ExtractionSchema:
+        """Create a schema."""
+        try:
+            return asyncio.run(self.acreate_schema(name, data_schema, project_id))
+        except RuntimeError as e:
+            if nest_asyncio_err in str(e):
+                raise RuntimeError(nest_asyncio_msg)
+            else:
+                raise e
+
     async def alist_schemas(
         self, project_id: Optional[str] = None
     ) -> List[ExtractionSchema]:
         """List all schemas."""
-        response = await self._async_client.extraction.list_schemas(
+        extraction_schemas = await self._async_client.extraction.list_schemas(
             project_id=project_id
         )
-        return response.results
+        return extraction_schemas
 
     def list_schemas(self, project_id: Optional[str] = None) -> List[ExtractionSchema]:
         """List all schemas."""
@@ -291,8 +318,10 @@ class LlamaExtract(BaseComponent):
 
     async def alist_jobs(self, schema_id: str) -> List[ExtractionJob]:
         """List all jobs."""
-        response = await self._async_client.extraction.list_jobs(schema_id=schema_id)
-        return response.results
+        extraction_jobs = await self._async_client.extraction.list_jobs(
+            schema_id=schema_id
+        )
+        return extraction_jobs
 
     def list_jobs(self, schema_id: str) -> List[ExtractionJob]:
         """List all jobs."""

@@ -873,13 +873,13 @@ files = [
 
 [[package]]
 name = "importlib-metadata"
-version = "8.1.0"
+version = "8.2.0"
 description = "Read metadata from Python packages"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "importlib_metadata-8.1.0-py3-none-any.whl", hash = "sha256:3cd29f739ed65973840b068e3132135ce954c254d48b5b640484467ef7ab3c8c"},
-    {file = "importlib_metadata-8.1.0.tar.gz", hash = "sha256:fcdcb1d5ead7bdf3dd32657bb94ebe9d2aabfe89a19782ddc32da5041d6ebfb4"},
+    {file = "importlib_metadata-8.2.0-py3-none-any.whl", hash = "sha256:11901fa0c2f97919b288679932bb64febaeacf289d18ac84dd68cb2e74213369"},
+    {file = "importlib_metadata-8.2.0.tar.gz", hash = "sha256:72e8d4399996132204f9a16dcc751af254a48f8d1b20b9ff0f98d4a8f901e73d"},
 ]
 
 [package.dependencies]
@@ -1048,13 +1048,13 @@ test = ["ipykernel", "pre-commit", "pytest (<8)", "pytest-cov", "pytest-timeout"
 
 [[package]]
 name = "llama-cloud"
-version = "0.0.10"
+version = "0.0.11"
 description = ""
 optional = false
 python-versions = "<4,>=3.8"
 files = [
-    {file = "llama_cloud-0.0.10-py3-none-any.whl", hash = "sha256:87b74dcc1dd704309258e8d9fb60fddb85029250db7050637213dcceee9dd3d3"},
-    {file = "llama_cloud-0.0.10.tar.gz", hash = "sha256:d82c954b5f437881657a9cc5eb1247b8c8b7191e9615fc0537cf8a323619424e"},
+    {file = "llama_cloud-0.0.11-py3-none-any.whl", hash = "sha256:7e2c673a4ab50749e20807f57bc511e81a04cf70d0dbd5db2a1d74d6599fec3f"},
+    {file = "llama_cloud-0.0.11.tar.gz", hash = "sha256:100882b528892065211436da048252d57eca14d8683d2fde6f89eeb20950ac18"},
 ]
 
 [package.dependencies]
@@ -1063,13 +1063,13 @@ pydantic = ">=1.10"
 
 [[package]]
 name = "llama-index-core"
-version = "0.10.57"
+version = "0.10.58"
 description = "Interface between LLMs and your data"
 optional = false
 python-versions = "<4.0,>=3.8.1"
 files = [
-    {file = "llama_index_core-0.10.57-py3-none-any.whl", hash = "sha256:4f3fedfa0c08454d30bb91ea7c3653adba5a4a4f027970ed6b18a678bb468d8c"},
-    {file = "llama_index_core-0.10.57.tar.gz", hash = "sha256:f5f99a9685dafeda89dff26095e10e2889ae74b50d607d6aeee06f7a65b3a207"},
+    {file = "llama_index_core-0.10.58-py3-none-any.whl", hash = "sha256:2345d9b20e21d0ec00e9282fe88a5e4a0eba2e732e577d1b0348512e9181a74f"},
+    {file = "llama_index_core-0.10.58.tar.gz", hash = "sha256:f5730be1861a8fd0ef94e9f412a713132184b887b8a79347514efb672bf749fc"},
 ]
 
 [package.dependencies]
@@ -2729,4 +2729,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8.1,<4.0"
-content-hash = "1b3984e6cbfb40ecef4d900d4148b15a2f3ab91cecadd839401937b2def4de6a"
+content-hash = "5d0a06c74ea6976e9f3dba2a2e2f958cc6af529308e3579c0710b9e7b451fc2e"
