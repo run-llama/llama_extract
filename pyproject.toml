@@ -14,7 +14,7 @@ packages = [{include = "llama_extract"}]
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 llama-index-core = ">=0.10.29"
-llama-cloud = "^0.0.10"
+llama-cloud = "^0.0.11"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
