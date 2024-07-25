@@ -271,7 +271,7 @@ class LlamaExtract(BaseComponent):
     ) -> ExtractionSchema:
         """Create a schema."""
         try:
-            return asyncio.run(self.acreate_schema(name, data_schema, project_id))
+            return asyncio_run(self.acreate_schema(name, data_schema, project_id))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)

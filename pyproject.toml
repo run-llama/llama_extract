@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "llama-extract"
-version = "0.0.3"
+version = "0.0.4"
 description = "Infer schema and extract data from unstructured files"
 authors = ["Logan Markewich <logan@llamaindex.ai>"]
 license = "MIT"
