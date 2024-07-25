@@ -4,8 +4,8 @@ import time
 from io import BufferedIOBase, BufferedReader, BytesIO
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from pydantic import BaseModel
-from typing import List, Optional, Type, Union
+from pydantic import BaseModel, ValidationError
+from typing import List, Optional, Tuple, Type, Union
 import urllib.parse
 
 
@@ -30,7 +30,8 @@ from llama_index.core.constants import DEFAULT_BASE_URL
 FileInput = Union[str, Path, bytes, BufferedIOBase]
 
 SchemaInput = Union[dict, Type[BaseModel]]
-
+ExtractionOutput = Union[ExtractionResult, Tuple[ExtractionResult, Optional[BaseModel]]]
+ExtractionOutputList = Union[List[ExtractionResult], Tuple[List[ExtractionResult], List[Optional[BaseModel]]]]
 
 class LlamaExtract(BaseComponent):
     """A extractor for unstructured data."""
@@ -371,15 +372,43 @@ class LlamaExtract(BaseComponent):
             else:
                 raise e
 
-    async def aget_job_result(self, job_id: str) -> ExtractionResult:
-        """Get a job result."""
-        response = await self._async_client.extraction.get_job_result(job_id=job_id)
-        return response
+    async def aget_job_result(self, job_id: str, response_model: Optional[Type[BaseModel]] = None) -> ExtractionOutput:
+        """Get a job result.
+        
+        Args:
+            job_id: The job id.
+            response_model: The response model to validate the response with.
 
-    def get_job_result(self, job_id: str) -> ExtractionResult:
-        """Get a job result."""
+        Returns:
+            If response_model is None, directly returns the raw extraction result.
+            If response_model is provided, returns a tuple of the raw extraction result and the validated model.
+        """
+        response = await self._async_client.extraction.get_job_result(job_id=job_id)
+        if response_model is None:
+            return response
+        
+        # validate response with the response model
+        try: 
+            model = response_model.model_validate(response)
+        except ValidationError:
+            if self.verbose:
+                print (f"Failed to validate the response with the model {response_model}, returning the response as is.")
+            model = None 
+        return response, model
+
+    def get_job_result(self, job_id: str, response_model: Optional[Type[BaseModel]] = None) -> ExtractionOutput:
+        """Get a job result.
+
+        Args:
+            job_id: The job id.
+            response_model: The response model to validate the response with.
+
+        Returns:
+            If response_model is None, directly returns the raw extraction result.
+            If response_model is provided, returns a tuple of the raw extraction result and the validated model. 
+        """
         try:
-            return asyncio_run(self.aget_job_result(job_id))
+            return asyncio_run(self.aget_job_result(job_id, response_model=response_model))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -387,9 +416,20 @@ class LlamaExtract(BaseComponent):
                 raise e
 
     async def aextract(
-        self, schema_id: str, files: List[FileInput], project_id: Optional[str] = None
-    ) -> List[ExtractionResult]:
-        """Extract data from a file using a schema."""
+        self, schema_id: str, files: List[FileInput], project_id: Optional[str] = None, response_model: Optional[Type[BaseModel]] = None
+    ) -> ExtractionOutputList:
+        """Extract data from a file using a schema.
+        
+        Args:
+            schema_id: The schema id.
+            files: The list of files to extract.
+            project_id: The project id.
+            response_model: The response model to validate the response with.
+
+        Returns:
+            If response_model is None, directly returns the list of raw extraction results.
+            If response_model is provided, returns a tuple of the list of raw extraction results and the list of validated models.
+        """
 
         jobs = [
             self._extract(
@@ -409,7 +449,18 @@ class LlamaExtract(BaseComponent):
                 show_progress=self.show_progress,
             )
 
-            return results
+            if response_model is None:
+                return results
+
+            try:
+                models = [response_model.model_validate(result.data) for result in results]
+            except ValidationError:
+                if self.verbose:
+                    print (f"Failed to validate the response with the model {response_model}, returning the response as is.")
+                models = [None] * len(results)
+
+            return results, models
+
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
@@ -421,10 +472,22 @@ class LlamaExtract(BaseComponent):
         schema_id: str,
         file_input: List[FileInput],
         project_id: Optional[str] = None,
-    ) -> List[ExtractionResult]:
-        """Extract data from a file using a schema."""
+        response_model: Optional[Type[BaseModel]] = None,
+    ) -> ExtractionOutputList:
+        """Extract data from a file using a schema.
+
+        Args:
+            schema_id: The schema id.
+            files: The list of files to extract.
+            project_id: The project id.
+            response_model: the response model to validate the response with.
+
+        Returns:
+            If response_model is None, directly returns the list of raw extraction results.
+            If response_model is provided, returns a tuple of the list of raw extraction results and the list of validated 
+        """
         try:
-            return asyncio_run(self.aextract(schema_id, file_input, project_id))
+            return asyncio_run(self.aextract(schema_id, file_input, project_id, response_model=response_model))
         except RuntimeError as e:
             if nest_asyncio_err in str(e):
                 raise RuntimeError(nest_asyncio_msg)
