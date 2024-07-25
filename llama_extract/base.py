@@ -4,7 +4,8 @@ import time
 from io import BufferedIOBase, BufferedReader, BytesIO
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from typing import List, Optional, Union
+from pydantic import BaseModel
+from typing import List, Optional, Type, Union
 import urllib.parse
 
 
@@ -27,6 +28,8 @@ from llama_index.core.constants import DEFAULT_BASE_URL
 
 # can put in a path to the file or the file bytes itself
 FileInput = Union[str, Path, bytes, BufferedIOBase]
+
+SchemaInput = Union[dict, Type[BaseModel]]
 
 
 class LlamaExtract(BaseComponent):
@@ -237,19 +240,30 @@ class LlamaExtract(BaseComponent):
     async def acreate_schema(
         self,
         name: str,
-        data_schema: dict,
+        data_schema: SchemaInput,
         project_id: Optional[str] = None,
     ) -> ExtractionSchema:
         """Create a schema."""
+
+        if isinstance(data_schema, dict):
+            json_schema = data_schema
+        elif issubclass(data_schema, BaseModel):
+            json_schema = data_schema.model_json_schema()
+        else:
+            raise ValueError(
+                "data_schema must be either a dictionary or a Pydantic model"
+            )
+
+
         response = await self._async_client.extraction.create_schema(
-            name=name, data_schema=data_schema, project_id=project_id
+            name=name, data_schema=json_schema, project_id=project_id
         )
         return response
 
     def create_schema(
         self,
         name: str,
-        data_schema: dict,
+        data_schema: SchemaInput,
         project_id: Optional[str] = None,
     ) -> ExtractionSchema:
         """Create a schema."""
@@ -296,16 +310,25 @@ class LlamaExtract(BaseComponent):
                 raise e
 
     async def aupdate_schema(
-        self, schema_id: str, data_schema: Optional[dict] = None
+        self, schema_id: str, data_schema: Optional[SchemaInput] = None
     ) -> ExtractionSchema:
         """Update a schema."""
+        if isinstance(data_schema, dict):
+            json_schema = data_schema
+        elif issubclass(data_schema, BaseModel):
+            json_schema = data_schema.model_json_schema()
+        else:
+            raise ValueError(
+                "data_schema must be either a dictionary or a Pydantic model"
+            )
+
         response = await self._async_client.extraction.update_schema(
-            schema_id=schema_id, data_schema=data_schema
+            schema_id=schema_id, data_schema=json_schema
         )
         return response
 
     def update_schema(
-        self, schema_id: str, data_schema: Optional[dict] = None
+        self, schema_id: str, data_schema: Optional[SchemaInput] = None
     ) -> ExtractionSchema:
         """Update a schema."""
         try:
