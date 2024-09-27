@@ -7,7 +7,7 @@ import pydantic.v1 as pydantic_v1
 from io import BufferedIOBase, BufferedReader, BytesIO
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from pydantic import BaseModel, Extra, ValidationError
+from pydantic import BaseModel, ValidationError
 from typing import List, Optional, Tuple, Type, Union
 import urllib.parse
 
@@ -26,7 +26,7 @@ from llama_cloud.core import ApiError, jsonable_encoder
 from llama_extract.utils import nest_asyncio_err, nest_asyncio_msg
 from llama_index.core.schema import BaseComponent
 from llama_index.core.async_utils import asyncio_run, run_jobs
-from llama_index.core.bridge.pydantic import Field, pydantic, PrivateAttr
+from llama_index.core.bridge.pydantic import Field, PrivateAttr
 from llama_index.core.constants import DEFAULT_BASE_URL
 
 # can put in a path to the file or the file bytes itself
@@ -224,7 +224,7 @@ class LlamaExtract(BaseComponent):
             _response_json = _response.json()
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, body=_response.text)
-        
+
         raise ApiError(status_code=_response.status_code, body=_response_json)
 
     def infer_schema(
