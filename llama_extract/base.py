@@ -1,10 +1,13 @@
 import asyncio
 import os
 import time
+
+import pydantic.v1 as pydantic_v1
+
 from io import BufferedIOBase, BufferedReader, BytesIO
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Extra, ValidationError
 from typing import List, Optional, Tuple, Type, Union
 import urllib.parse
 
@@ -212,15 +215,16 @@ class LlamaExtract(BaseComponent):
         )
 
         if 200 <= _response.status_code < 300:
-            return pydantic.parse_obj_as(ExtractionSchema, _response.json())  # type: ignore
+            return pydantic_v1.parse_obj_as(ExtractionSchema, _response.json())
         if _response.status_code == 422:
             raise UnprocessableEntityError(
-                pydantic.parse_obj_as(HttpValidationError, _response.json())
-            )  # type: ignore
+                pydantic_v1.parse_obj_as(HttpValidationError, _response.json())
+            )
         try:
             _response_json = _response.json()
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, body=_response.text)
+        
         raise ApiError(status_code=_response.status_code, body=_response_json)
 
     def infer_schema(
