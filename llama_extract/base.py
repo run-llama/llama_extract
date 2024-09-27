@@ -1,6 +1,9 @@
 import asyncio
 import os
 import time
+
+import pydantic.v1 as pydantic_v1
+
 from io import BufferedIOBase, BufferedReader, BytesIO
 from json.decoder import JSONDecodeError
 from pathlib import Path
@@ -23,7 +26,7 @@ from llama_cloud.core import ApiError, jsonable_encoder
 from llama_extract.utils import nest_asyncio_err, nest_asyncio_msg
 from llama_index.core.schema import BaseComponent
 from llama_index.core.async_utils import asyncio_run, run_jobs
-from llama_index.core.bridge.pydantic import Field, pydantic, PrivateAttr
+from llama_index.core.bridge.pydantic import Field, PrivateAttr
 from llama_index.core.constants import DEFAULT_BASE_URL
 
 # can put in a path to the file or the file bytes itself
@@ -212,15 +215,16 @@ class LlamaExtract(BaseComponent):
         )
 
         if 200 <= _response.status_code < 300:
-            return pydantic.parse_obj_as(ExtractionSchema, _response.json())  # type: ignore
+            return pydantic_v1.parse_obj_as(ExtractionSchema, _response.json())
         if _response.status_code == 422:
             raise UnprocessableEntityError(
-                pydantic.parse_obj_as(HttpValidationError, _response.json())
-            )  # type: ignore
+                pydantic_v1.parse_obj_as(HttpValidationError, _response.json())
+            )
         try:
             _response_json = _response.json()
         except JSONDecodeError:
             raise ApiError(status_code=_response.status_code, body=_response.text)
+
         raise ApiError(status_code=_response.status_code, body=_response_json)
 
     def infer_schema(
