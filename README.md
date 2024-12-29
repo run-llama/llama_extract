@@ -1,5 +1,8 @@
 # LlamaExtract (Experimental)
 
+**NOTE:** This API is deprecated in favor of a more mature LlamaExtract offering that will be released soon. We will have an update for you shortly.
+
+
 LlamaExtract is an API created by LlamaIndex to efficiently infer schema and extract data from unstructured files.
 
 LlamaExtract directly integrates with [LlamaIndex](https://github.com/run-llama/llama_index).
