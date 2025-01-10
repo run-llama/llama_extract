@@ -1,0 +1,578 @@
+import asyncio
+import os
+import time
+from io import BufferedIOBase, BufferedReader, BytesIO
+from pathlib import Path
+from typing import List, Optional, Type, Union, Tuple
+import warnings
+import httpx
+from pydantic import BaseModel
+from llama_cloud import (
+    ExtractAgent as CloudExtractAgent,
+    ExtractConfig,
+    ExtractJob,
+    ExtractJobCreate,
+    ExtractResultset,
+    ExtractRun,
+    File,
+    ExtractMode,
+    StatusEnum,
+    Project,
+)
+from llama_cloud.client import AsyncLlamaCloud
+from llama_extract.utils import JSONObjectType, run_sync, handle_async_errors
+from llama_index.core.schema import BaseComponent
+from llama_index.core.async_utils import run_jobs
+from llama_index.core.bridge.pydantic import Field, PrivateAttr
+from llama_index.core.constants import DEFAULT_BASE_URL
+from concurrent.futures import ThreadPoolExecutor
+
+FileInput = Union[str, Path, bytes, BufferedIOBase]
+SchemaInput = Union[JSONObjectType, Type[BaseModel]]
+
+DEFAULT_EXTRACT_CONFIG = ExtractConfig(
+    extraction_mode=ExtractMode.PER_DOC,
+)
+
+ExtractionResult = Tuple[ExtractJob, ExtractResultset]
+
+
+class ExtractionAgent:
+    """Class representing a single extraction agent with methods for extraction operations."""
+
+    def __init__(
+        self,
+        client: AsyncLlamaCloud,
+        agent: CloudExtractAgent,
+        project_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
+        check_interval: int = 1,
+        max_timeout: int = 2000,
+        num_workers: int = 4,
+        show_progress: bool = True,
+        verbose: bool = False,
+    ):
+        self._client = client
+        self._agent = agent
+        self._project_id = project_id
+        self._organization_id = organization_id
+        self.check_interval = check_interval
+        self.max_timeout = max_timeout
+        self.num_workers = num_workers
+        self.show_progress = show_progress
+        self._verbose = verbose
+        self._data_schema = None
+        self._config = None
+        self._thread_pool = ThreadPoolExecutor(
+            max_workers=min(10, (os.cpu_count() or 1) + 4)
+        )
+
+    def _run_in_thread(self, coro):
+        """Run coroutine in a separate thread to avoid event loop issues"""
+
+        def run_coro():
+            async def wrapped_coro():
+                async with httpx.AsyncClient(
+                    timeout=self._client._client_wrapper.httpx_client.timeout,
+                ) as client:
+                    original_client = self._client._client_wrapper.httpx_client
+                    self._client._client_wrapper.httpx_client = client
+                    try:
+                        return await coro
+                    finally:
+                        self._client._client_wrapper.httpx_client = original_client
+
+            return asyncio.run(wrapped_coro())
+
+        return self._thread_pool.submit(run_coro).result()
+
+    @property
+    def id(self) -> str:
+        return self._agent.id
+
+    @property
+    def name(self) -> str:
+        return self._agent.name
+
+    @property
+    def data_schema(self) -> dict:
+        return self._agent.data_schema if not self._data_schema else self._data_schema
+
+    @data_schema.setter
+    def data_schema(self, data_schema: SchemaInput):
+        if isinstance(data_schema, dict):
+            data_schema = data_schema
+        elif issubclass(data_schema, BaseModel):
+            data_schema = data_schema.model_json_schema()
+        else:
+            raise ValueError(
+                "data_schema must be either a dictionary or a Pydantic model"
+            )
+        self._data_schema = data_schema
+
+    @property
+    def config(self) -> ExtractConfig:
+        return self._agent.config if not self._config else self._config
+
+    @config.setter
+    def config(self, config: ExtractConfig):
+        self._config = config
+
+    def _run_sync(self, coro):
+        """Helper method to run async code in sync context."""
+        with run_sync() as runner:
+            return runner(coro)
+
+    async def _upload_file(self, file_input: FileInput) -> File:
+        """Upload a file for extraction."""
+        if isinstance(file_input, BufferedIOBase):
+            upload_file = file_input
+        elif isinstance(file_input, bytes):
+            upload_file = BytesIO(file_input)
+        elif isinstance(file_input, (str, Path)):
+            upload_file = open(file_input, "rb")
+        else:
+            raise ValueError(
+                "file_input must be either a file path string, file bytes, or buffer object"
+            )
+
+        try:
+            return await self._client.files.upload_file(
+                project_id=self._project_id, upload_file=upload_file
+            )
+        finally:
+            if isinstance(upload_file, BufferedReader):
+                upload_file.close()
+
+    async def _wait_for_job_result(self, job_id: str) -> ExtractionResult:
+        """Wait for and return the results of an extraction job."""
+        start = time.perf_counter()
+        tries = 0
+        while True:
+            await asyncio.sleep(self.check_interval)
+            tries += 1
+            job = await self._client.llama_extract.get_job(
+                job_id=job_id,
+            )
+
+            if job.status == StatusEnum.SUCCESS:
+                result = await self._client.llama_extract.get_job_result(
+                    job_id=job_id,
+                )
+                return (job, result)
+            elif job.status == StatusEnum.PENDING:
+                end = time.perf_counter()
+                if end - start > self.max_timeout:
+                    raise Exception(f"Timeout while extracting the file: {job_id}")
+                if self._verbose and tries % 10 == 0:
+                    print(".", end="", flush=True)
+                continue
+            else:
+                warnings.warn(
+                    f"Failure in job: {job_id}, status: {job.status}, error: {job.error}"
+                )
+                return (job, None)
+
+    def save(self) -> None:
+        """Persist the extraction agent's schema and config to the database.
+
+        Returns:
+            ExtractionAgent: The updated extraction agent
+        """
+        self._agent = self._run_in_thread(
+            self._client.llama_extract.update_extraction_agent(
+                extraction_agent_id=self.id,
+                data_schema=self.data_schema,
+                config=self.config,
+            )
+        )
+
+    async def queue_extraction(
+        self,
+        files: Union[FileInput, List[FileInput]],
+    ) -> Union[ExtractionResult, List[ExtractionResult]]:
+        """
+        Queue multiple files for extraction.
+
+        Args:
+            files (Union[FileInput, List[FileInput]]): The files to extract
+
+        Returns:
+            Union[ExtractionResult, List[ExtractionResult]]: The queued extraction jobs
+        """
+        """Queue one or more files for extraction concurrently."""
+        if not isinstance(files, list):
+            files = [files]
+            single_file = True
+        else:
+            single_file = False
+
+        upload_tasks = [self._upload_file(file) for file in files]
+        with handle_async_errors():
+            uploaded_files = await run_jobs(
+                upload_tasks,
+                workers=self.num_workers,
+                desc="Uploading files",
+                show_progress=self.show_progress,
+            )
+
+        job_tasks = [
+            self._client.llama_extract.run_job(
+                request=ExtractJobCreate(
+                    extraction_agent_id=self.id,
+                    file_id=file.id,
+                    data_schema_override=self.data_schema,
+                    config_override=self.config,
+                ),
+            )
+            for file in uploaded_files
+        ]
+        with handle_async_errors():
+            results = await run_jobs(
+                job_tasks,
+                workers=self.num_workers,
+                desc="Creating extraction jobs",
+                show_progress=self.show_progress,
+            )
+
+        if self._verbose:
+            for file, job in zip(files, results):
+                file_repr = (
+                    str(file) if isinstance(file, (str, Path)) else "<bytes/buffer>"
+                )
+                print(
+                    f"Queued file extraction for file {file_repr} under job_id {job.id}"
+                )
+
+        return results[0] if single_file else results
+
+    async def aextract(
+        self, files: Union[FileInput, List[FileInput]]
+    ) -> Union[ExtractionResult, List[ExtractionResult]]:
+        """Asynchronously extract data from one or more files using this agent.
+
+        Args:
+            files (Union[FileInput, List[FileInput]]): The files to extract
+
+        Returns:
+            Union[ExtractionResult, List[ExtractionResult]]: The extraction results
+        """
+        if not isinstance(files, list):
+            files = [files]
+            single_file = True
+        else:
+            single_file = False
+
+        # Queue all files for extraction
+        jobs = await self.queue_extraction(files)
+        # Wait for all results concurrently
+        result_tasks = [self._wait_for_job_result(job.id) for job in jobs]
+        with handle_async_errors():
+            results = await run_jobs(
+                result_tasks,
+                workers=self.num_workers,
+                desc="Extracting files",
+                show_progress=self.show_progress,
+            )
+
+        return results[0] if single_file else results
+
+    def extract(
+        self, files: Union[FileInput, List[FileInput]]
+    ) -> Union[ExtractionResult, List[ExtractionResult]]:
+        """Synchronously extract data from one or more files using this agent.
+
+        Args:
+            files (Union[FileInput, List[FileInput]]): The files to extract
+
+        Returns:
+            Union[ExtractionResult, List[ExtractionResult]]: The extraction results
+        """
+        return self._run_in_thread(self.aextract(files))
+
+    def list_extraction_runs(
+        self,
+        job_id: Optional[str] = None,
+    ) -> List[ExtractRun]:
+        """List extraction runs with optional filters. If no filters are provided,
+        list all extraction runs for the extraction agent.
+
+        Args:
+            job_id (Optional[str]): Filter by job ID
+
+        Returns:
+            List[ExtractRun]: List of extraction runs
+        """
+        return self._run_in_thread(
+            self._client.llama_extract.list_extract_runs(
+                extraction_agent_id=self.id,
+                job_id=job_id,
+            )
+        )
+
+    def __repr__(self):
+        return f"ExtractionAgent(id={self.id}, name={self.name})"
+
+
+class LlamaExtract(BaseComponent):
+    """Factory class for creating and managing extraction agents."""
+
+    api_key: str = Field(description="The API key for the LlamaExtract API.")
+    base_url: str = Field(description="The base URL of the LlamaExtract API.")
+    check_interval: int = Field(
+        default=1,
+        description="The interval in seconds to check if the extraction is done.",
+    )
+    max_timeout: int = Field(
+        default=2000,
+        description="The maximum timeout in seconds to wait for the extraction to finish.",
+    )
+    num_workers: int = Field(
+        default=4,
+        gt=0,
+        lt=10,
+        description="The number of workers to use sending API requests for extraction.",
+    )
+    show_progress: bool = Field(
+        default=True, description="Show progress when extracting multiple files."
+    )
+    verbose: bool = Field(
+        default=False, description="Show verbose output when extracting files."
+    )
+    _async_client: AsyncLlamaCloud = PrivateAttr()
+    _thread_pool: ThreadPoolExecutor = PrivateAttr()
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        check_interval: int = 1,
+        max_timeout: int = 2000,
+        num_workers: int = 4,
+        show_progress: bool = True,
+        project_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
+        verbose: bool = False,
+    ):
+        if not api_key:
+            api_key = os.getenv("LLAMA_CLOUD_API_KEY", None)
+            if api_key is None:
+                raise ValueError("The API key is required.")
+
+        if not base_url:
+            base_url = os.getenv("LLAMA_CLOUD_BASE_URL", None) or DEFAULT_BASE_URL
+
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url,
+            check_interval=check_interval,
+            max_timeout=max_timeout,
+            num_workers=num_workers,
+            show_progress=show_progress,
+            verbose=verbose,
+        )
+
+        self._async_client = AsyncLlamaCloud(
+            token=self.api_key, base_url=self.base_url, timeout=None
+        )
+        # Fetch default project id if not provided
+        if project_id is None:
+            projects: List[Project] = self._run_sync(
+                self._async_client.projects.list_projects()
+            )
+            default_project = [p for p in projects if p.is_default]
+            if not default_project:
+                raise ValueError(
+                    "No default project found. Please provide a project_id."
+                )
+            project_id = default_project[0].id
+
+        self._project_id = project_id
+        self._organization_id = organization_id
+        self._thread_pool = ThreadPoolExecutor(
+            max_workers=min(10, (os.cpu_count() or 1) + 4)
+        )
+
+    def _run_in_thread(self, coro):
+        """Run coroutine in a separate thread to avoid event loop issues"""
+
+        def run_coro():
+            # Create a new client for this thread
+            async def wrapped_coro():
+                async with httpx.AsyncClient(
+                    timeout=self._async_client._client_wrapper.httpx_client.timeout,
+                ) as client:
+                    # Replace the client in the coro's context
+                    original_client = self._async_client._client_wrapper.httpx_client
+                    self._async_client._client_wrapper.httpx_client = client
+                    try:
+                        return await coro
+                    finally:
+                        self._async_client._client_wrapper.httpx_client = (
+                            original_client
+                        )
+
+            return asyncio.run(wrapped_coro())
+
+        return self._thread_pool.submit(run_coro).result()
+
+    def _run_sync(self, coro):
+        """Helper method to run async code in sync context."""
+        with run_sync() as runner:
+            return runner(coro)
+
+    def create_agent(
+        self,
+        name: str,
+        data_schema: SchemaInput,
+        config: Optional[ExtractConfig] = None,
+    ) -> ExtractionAgent:
+        """Create a new extraction agent.
+
+        Args:
+            name (str): The name of the extraction agent
+            data_schema (SchemaInput): The data schema for the extraction agent
+            config (Optional[ExtractConfig]): The extraction config for the agent
+
+        Returns:
+            ExtractionAgent: The created extraction agent
+        """
+
+        if isinstance(data_schema, dict):
+            data_schema = data_schema
+        elif issubclass(data_schema, BaseModel):
+            data_schema = data_schema.model_json_schema()
+        else:
+            raise ValueError(
+                "data_schema must be either a dictionary or a Pydantic model"
+            )
+
+        agent = self._run_in_thread(
+            self._async_client.llama_extract.create_extraction_agent(
+                name=name,
+                data_schema=data_schema,
+                config=config or DEFAULT_EXTRACT_CONFIG,
+                project_id=self._project_id,
+                organization_id=self._organization_id,
+            )
+        )
+
+        return ExtractionAgent(
+            client=self._async_client,
+            agent=agent,
+            project_id=self._project_id,
+            organization_id=self._organization_id,
+            check_interval=self.check_interval,
+            max_timeout=self.max_timeout,
+            num_workers=self.num_workers,
+            show_progress=self.show_progress,
+            verbose=self.verbose,
+        )
+
+    def get_agent(
+        self,
+        name: Optional[str] = None,
+        id: Optional[str] = None,
+    ) -> ExtractionAgent:
+        """Get extraction agents by name or extraction agent ID.
+
+        Args:
+            name (Optional[str]): Filter by name
+            extraction_agent_id (Optional[str]): Filter by extraction agent ID
+
+        Returns:
+            ExtractionAgent: The extraction agent
+        """
+        if id is not None and name is not None:
+            warnings.warn(
+                "Both name and extraction_agent_id are provided. Using extraction_agent_id."
+            )
+
+        if id:
+            agent = self._run_in_thread(
+                self._async_client.llama_extract.get_extraction_agent(
+                    extraction_agent_id=id,
+                )
+            )
+
+        elif name:
+            agent = self._run_in_thread(
+                self._async_client.llama_extract.list_extraction_agents(
+                    project_id=self._project_id,
+                    name=name,
+                )
+            )[0]
+        else:
+            raise ValueError("Either name or extraction_agent_id must be provided.")
+
+        return ExtractionAgent(
+            client=self._async_client,
+            agent=agent,
+            project_id=self._project_id,
+            organization_id=self._organization_id,
+            check_interval=self.check_interval,
+            max_timeout=self.max_timeout,
+            num_workers=self.num_workers,
+            show_progress=self.show_progress,
+            verbose=self.verbose,
+        )
+
+    def list_agents(self) -> List[ExtractionAgent]:
+        """List all available extraction agents."""
+        agents = self._run_in_thread(
+            self._async_client.llama_extract.list_extraction_agents(
+                project_id=self._project_id,
+            )
+        )
+
+        return [
+            ExtractionAgent(
+                client=self._async_client,
+                agent=agent,
+                project_id=self._project_id,
+                organization_id=self._organization_id,
+                check_interval=self.check_interval,
+                max_timeout=self.max_timeout,
+                num_workers=self.num_workers,
+                show_progress=self.show_progress,
+                verbose=self.verbose,
+            )
+            for agent in agents
+        ]
+
+    def delete_agent(self, agent_id: str):
+        """Delete an extraction agent by ID.
+
+        Args:
+            agent_id (str): ID of the extraction agent to delete
+        """
+        self._run_in_thread(
+            self._async_client.llama_extract.delete_extraction_agent(
+                extraction_agent_id=agent_id
+            )
+        )
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    data_dir = Path(__file__).parent.parent / "tests" / "data"
+    extractor = LlamaExtract()
+    try:
+        agent = extractor.get_extraction_agent(name="test-agent")
+    except Exception:
+        agent = extractor.create_agent(
+            "test-agent",
+            {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "summary": {"type": "string"},
+                },
+            },
+        )
+    results = agent.extract(data_dir / "slide" / "conocophilips.pdf")
+    extractor.delete_agent(agent.id)
+    print(results)

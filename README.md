@@ -1,55 +1,61 @@
-# LlamaExtract (Experimental)
+# LlamaExtract (EXPERIMENTAL)
+
+LlamaExtract provides a simple API for extracting structured data from unstructured text.
 
 > **⚠️ Warning**  
-> This version of LlamaExtract is no longer supported. A new and improved version is under development and will be released soon.
+> 🚧 
+>
+> The released version of LlamaExtract on PyPi is no longer supported. This library is under active development and we will share an updated version 
+> on PyPi very soon. In the meantime, please do not use this code on Github. If you are interested in being an early adopter, please contact us 
+> at [support@llamaindex.ai](mailto:support@llamaindex.ai) or reach out on [Discord](https://discord.com/invite/eN6D2HQ4aX). 
+>
+> 🚧 
 
+## Installation
 
-LlamaExtract is an API created by LlamaIndex to efficiently infer schema and extract data from unstructured files.
-
-LlamaExtract directly integrates with [LlamaIndex](https://github.com/run-llama/llama_index).
-
-Note: LlamaExtract is currently experimental and may change in the future.
-
-Read below for some quickstart information, or see the [full documentation](https://docs.cloud.llamaindex.ai/).
-
-## Getting Started
-
-First, login and get an api-key from [**https://cloud.llamaindex.ai ↗**](https://cloud.llamaindex.ai).
-
-Install the package:
-
-`pip install llama-extract`
-
-Now you can easily infer schemas and extract data from your files:
-
-```python
-import nest_asyncio
-
-nest_asyncio.apply()
-
-from llama_extract import LlamaExtract
-
-extractor = LlamaExtract(
-    api_key="llx-...",  # can also be set in your env as LLAMA_CLOUD_API_KEY
-    num_workers=4,  # if multiple files passed, split in `num_workers` API calls
-    verbose=True,
-)
-
-# Infer schema
-schema = extractor.infer_schema(
-    "my_schema", ["./my_file1.pdf", "./my_file2.pdf"]
-)
-
-# Extract data
-results = extractor.extract(schema.id, ["./my_file1.pdf", "./my_file2.pdf"])
+```bash
+# Warning: Contains breaking changes
+pip install llama-extract==0.1.0  
 ```
 
-## Examples
+## Usage
 
-Several end-to-end examples can be found in the examples folder
+### Create a LlamaExtract client
 
-- [Getting Started](examples/demo_basic.ipynb)
+```python
+extractor = LlamaExtract(api_key="YOUR_API_KEY")
+```
 
-## Documentation
+### Create an agent
 
-[https://docs.cloud.llamaindex.ai/](https://docs.cloud.llamaindex.ai/)
+```python
+agent = extractor.create_agent(name="test_agent", data_schema={
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "email": {"type": "string"},
+    },
+    "required": ["name", "email"],
+})
+```
+
+You can also pass in a Pydantic model to define the data schema.
+
+```python
+from pydantic import BaseModel
+
+class Resume(BaseModel):
+    name: str
+    email: str
+
+agent = extractor.create_agent(name="test_agent", data_schema=Resume)
+```
+
+### Extract data from a file
+
+```python
+result = await agent.aextract("path/to/resume.pdf")
+```
+
+For a more detailed example and an illustration of usage patterns, please refer to the [demo notebook](examples/resume_screening.ipynb). 
+

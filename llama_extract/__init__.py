@@ -1,3 +1,3 @@
-from llama_extract.base import LlamaExtract
+from llama_extract.extract import LlamaExtract, ExtractionAgent
 
-__all__ = ["LlamaExtract"]
+__all__ = ["LlamaExtract", "ExtractionAgent"]

@@ -4,19 +4,29 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "llama-extract"
-version = "0.0.5"
-description = "Infer schema and extract data from unstructured files"
-authors = ["Logan Markewich <logan@llamaindex.ai>"]
+version = "0.1.0"
+description = "Structured data extraction from files."
+authors = ["Logan Markewich <logan@runllama.ai>", "Neeraj Pradhan <neeraj@llamaindex.ai>"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "llama_extract"}]
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<4.0"
+python = ">=3.9,<4.0"
 llama-index-core = "^0.11.0"
-llama-cloud = ">=0.1.0"
+llama-cloud = "^0.1.9"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 ipykernel = "^6.29.0"
 pre-commit = "3.2.0"
+autoevals = "^0.0.114"
+deepdiff = "^8.1.1"
+ipython = "^8.12.3"
+jupyter = "^1.1.1"
+pytest-asyncio = {version = "^0.25.2", python = ">=3.9,<4.0"}
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
