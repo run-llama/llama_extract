@@ -13,6 +13,9 @@
     "python.analysis.typeCheckingMode": "off",
     "files.insertFinalNewline": true,
     "[json]": {
-        "editor.tabSize": 2
+        "editor.tabSize": 2,
+        "editor.defaultFormatter": "vscode.json-language-features",
+        "editor.detectIndentation": false,
+        "editor.insertSpaces": true
     }
 }
