@@ -369,6 +369,8 @@ class LlamaExtract(BaseComponent):
     )
     _async_client: AsyncLlamaCloud = PrivateAttr()
     _thread_pool: ThreadPoolExecutor = PrivateAttr()
+    _project_id: Optional[str] = PrivateAttr()
+    _organization_id: Optional[str] = PrivateAttr()
 
     def __init__(
         self,
@@ -403,6 +405,9 @@ class LlamaExtract(BaseComponent):
         self._async_client = AsyncLlamaCloud(
             token=self.api_key, base_url=self.base_url, timeout=None
         )
+        self._thread_pool = ThreadPoolExecutor(
+            max_workers=min(10, (os.cpu_count() or 1) + 4)
+        )
         # Fetch default project id if not provided
         if not project_id:
             project_id = os.getenv("LLAMA_CLOUD_PROJECT_ID", None)
@@ -420,9 +425,6 @@ class LlamaExtract(BaseComponent):
 
         self._project_id = project_id
         self._organization_id = organization_id
-        self._thread_pool = ThreadPoolExecutor(
-            max_workers=min(10, (os.cpu_count() or 1) + 4)
-        )
 
     def _run_in_thread(self, coro: Coroutine[Any, Any, T]) -> T:
         """Run coroutine in a separate thread to avoid event loop issues"""
