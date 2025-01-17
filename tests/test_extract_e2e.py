@@ -110,8 +110,7 @@ def extraction_agent(test_case: TestCase):
 )
 @pytest.mark.parametrize("test_case", get_test_cases(), ids=lambda x: x.name)
 def test_extraction(test_case: TestCase, extraction_agent: ExtractionAgent) -> None:
-    _, result = extraction_agent.extract(test_case.input_file)
-    result = result.data
+    result = extraction_agent.extract(test_case.input_file).data
     with open(test_case.expected_output, "r") as f:
         expected = json.load(f)
     assert json_subset_match_score(expected, result) > 0.5, DeepDiff(

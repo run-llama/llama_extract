@@ -9,7 +9,7 @@ on:
 
 env:
   POETRY_VERSION: "1.6.1"
-  PYTHON_VERSION: "3.10"
+  PYTHON_VERSION: "3.9"
 
 jobs:
   build-n-publish:

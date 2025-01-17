@@ -19,7 +19,7 @@ jobs:
       # For example, pypy-2.7 and pypy-3.8
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.10"]
+        python-version: ["3.9"]
     steps:
       - uses: actions/checkout@v3
       - name: Set up python ${{ matrix.python-version }}

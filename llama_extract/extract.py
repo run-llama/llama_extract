@@ -143,7 +143,7 @@ class ExtractionAgent:
             if isinstance(upload_file, BufferedReader):
                 upload_file.close()
 
-    async def _wait_for_job_result(self, job_id: str) -> ExtractionResult:
+    async def _wait_for_job_result(self, job_id: str) -> Optional[ExtractRun]:
         """Wait for and return the results of an extraction job."""
         start = time.perf_counter()
         tries = 0
@@ -155,10 +155,12 @@ class ExtractionAgent:
             )
 
             if job.status == StatusEnum.SUCCESS:
-                result = await self._client.llama_extract.get_job_result(
+                result = await self._client.llama_extract.list_extract_runs(
                     job_id=job_id,
                 )
-                return (job, result)
+                if not result:
+                    raise RuntimeError(f"No extraction runs found for job: {job_id}")
+                return result[0]
             elif job.status == StatusEnum.PENDING:
                 end = time.perf_counter()
                 if end - start > self.max_timeout:
@@ -170,7 +172,10 @@ class ExtractionAgent:
                 warnings.warn(
                     f"Failure in job: {job_id}, status: {job.status}, error: {job.error}"
                 )
-                return (job, None)
+                result = await self._client.llama_extract.list_extract_runs(
+                    job_id=job_id,
+                )
+                return result[0] if result else None
 
     def save(self) -> None:
         """Persist the extraction agent's schema and config to the database.
@@ -247,14 +252,14 @@ class ExtractionAgent:
 
     async def aextract(
         self, files: Union[FileInput, List[FileInput]]
-    ) -> Union[ExtractionResult, List[ExtractionResult]]:
+    ) -> Union[ExtractRun, List[ExtractRun]]:
         """Asynchronously extract data from one or more files using this agent.
 
         Args:
             files (Union[FileInput, List[FileInput]]): The files to extract
 
         Returns:
-            Union[ExtractionResult, List[ExtractionResult]]: The extraction results
+            Union[ExtractRun, List[ExtractRun]]: The extraction results
         """
         if not isinstance(files, list):
             files = [files]
@@ -278,26 +283,51 @@ class ExtractionAgent:
 
     def extract(
         self, files: Union[FileInput, List[FileInput]]
-    ) -> Union[ExtractionResult, List[ExtractionResult]]:
+    ) -> Union[ExtractRun, List[ExtractRun]]:
         """Synchronously extract data from one or more files using this agent.
 
         Args:
             files (Union[FileInput, List[FileInput]]): The files to extract
 
         Returns:
-            Union[ExtractionResult, List[ExtractionResult]]: The extraction results
+            Union[ExtractRun, List[ExtractRun]]: The extraction results
         """
         return self._run_in_thread(self.aextract(files))
 
-    def list_extraction_runs(
-        self,
-        job_id: Optional[str] = None,
-    ) -> List[ExtractRun]:
-        """List extraction runs with optional filters. If no filters are provided,
-        list all extraction runs for the extraction agent.
+    def get_extraction_job(self, job_id: str) -> ExtractJob:
+        """
+        Get the extraction job for a given job_id.
 
         Args:
-            job_id (Optional[str]): Filter by job ID
+            job_id (str): The job_id to get the extraction job for
+
+        Returns:
+            ExtractJob: The extraction job
+        """
+        return self._run_in_thread(self._client.llama_extract.get_job(job_id=job_id))
+
+    def get_extraction_run_for_job(self, job_id: str) -> ExtractRun:
+        """
+        Get the extraction run for a given job_id.
+
+        Args:
+            job_id (str): The job_id to get the extraction run for
+
+        Returns:
+            ExtractRun: The extraction run
+        """
+        run = self._run_in_thread(
+            self._client.llama_extract.list_extract_runs(
+                extraction_agent_id=self.id,
+                job_id=job_id,
+            )
+        )
+        if not run:
+            raise ValueError(f"No extraction run found for job: {job_id}")
+        return run[0]
+
+    def list_extraction_runs(self) -> List[ExtractRun]:
+        """List extraction runs for the extraction agent.
 
         Returns:
             List[ExtractRun]: List of extraction runs
@@ -305,7 +335,6 @@ class ExtractionAgent:
         return self._run_in_thread(
             self._client.llama_extract.list_extract_runs(
                 extraction_agent_id=self.id,
-                job_id=job_id,
             )
         )
 
@@ -375,16 +404,19 @@ class LlamaExtract(BaseComponent):
             token=self.api_key, base_url=self.base_url, timeout=None
         )
         # Fetch default project id if not provided
-        if project_id is None:
-            projects: List[Project] = self._run_sync(
-                self._async_client.projects.list_projects()
-            )
-            default_project = [p for p in projects if p.is_default]
-            if not default_project:
-                raise ValueError(
-                    "No default project found. Please provide a project_id."
+        if not project_id:
+            project_id = os.getenv("LLAMA_CLOUD_PROJECT_ID", None)
+            if not project_id:
+                print("No project_id provided, fetching default project.")
+                projects: List[Project] = self._run_in_thread(
+                    self._async_client.projects.list_projects()
                 )
-            project_id = default_project[0].id
+                default_project = [p for p in projects if p.is_default]
+                if not default_project:
+                    raise ValueError(
+                        "No default project found. Please provide a project_id."
+                    )
+                project_id = default_project[0].id
 
         self._project_id = project_id
         self._organization_id = organization_id

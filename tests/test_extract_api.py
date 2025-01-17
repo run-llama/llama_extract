@@ -135,16 +135,16 @@ class TestLlamaExtract:
 class TestExtractionAgent:
     @pytest.mark.asyncio
     async def test_extract_single_file(self, test_agent):
-        job, result = await test_agent.aextract(TEST_PDF)
-        assert job.status == "SUCCESS"
+        result = await test_agent.aextract(TEST_PDF)
+        assert result.status == "SUCCESS"
         assert result.data is not None
         assert isinstance(result.data, dict)
         assert "title" in result.data
         assert "summary" in result.data
 
     def test_sync_extract_single_file(self, test_agent):
-        job, result = test_agent.extract(TEST_PDF)
-        assert job.status == "SUCCESS"
+        result = test_agent.extract(TEST_PDF)
+        assert result.status == "SUCCESS"
         assert result.data is not None
         assert isinstance(result.data, dict)
         assert "title" in result.data
@@ -156,8 +156,8 @@ class TestExtractionAgent:
         response = await test_agent.aextract(files)
 
         assert len(response) == 2
-        for job, result in response:
-            assert job.status == "SUCCESS"
+        for result in response:
+            assert result.status == "SUCCESS"
             assert result.data is not None
             assert isinstance(result.data, dict)
             assert "title" in result.data
@@ -183,12 +183,6 @@ class TestExtractionAgent:
 
     def test_list_extraction_runs(self, test_agent: ExtractionAgent):
         assert len(test_agent.list_extraction_runs()) == 0
-        job, result = test_agent.extract(TEST_PDF)
-
+        test_agent.extract(TEST_PDF)
         runs = test_agent.list_extraction_runs()
         assert len(runs) > 0
-
-        # Test filtering by job ID
-        filtered_runs = test_agent.list_extraction_runs(job_id=job.id)
-        assert len(filtered_runs) > 0
-        assert all(run.id == result.run_id for run in filtered_runs)
