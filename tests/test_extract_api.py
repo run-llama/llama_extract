@@ -59,16 +59,10 @@ def test_schema_dict():
 
 @pytest.fixture
 def test_agent(llama_extract, test_agent_name, test_schema_dict, request):
-    """Creates a test agent and cleans it up after the test
-
-    Can be customized by passing markers:
-    @pytest.mark.agent_name("custom-name")
-    @pytest.mark.agent_schema({"type": "object", "properties": {...}})
-    """
-    # Get custom values from markers if they exist
+    """Creates a test agent and cleans it up after the test"""
     name = test_agent_name
     schema = test_schema_dict
-
+    # Get custom values from markers if they exist
     for marker in request.node.iter_markers("agent_name"):
         name = marker.args[0]
 
@@ -77,18 +71,21 @@ def test_agent(llama_extract, test_agent_name, test_schema_dict, request):
             marker.args[0][0] if isinstance(marker.args[0], tuple) else marker.args[0]
         )
 
+    # Clean up any existing agent before creating new one
     try:
-        existing_agent = llama_extract.get_agent(name=name)
-        if existing_agent:
-            llama_extract.delete_agent(existing_agent.id)
-    except ApiError as e:
-        if e.status_code == 404:
-            pass
-        else:
-            raise
+        agents = llama_extract.list_agents()
+        for agent in agents:
+            if agent.name == name:
+                llama_extract.delete_agent(agent.id)
+    except Exception as e:
+        print(f"Warning: Failed to cleanup existing agent: {str(e)}")
 
+    # Create new agent
     agent = llama_extract.create_agent(name=name, data_schema=schema)
+
     yield agent
+
+    # Cleanup after test
     try:
         llama_extract.delete_agent(agent.id)
     except Exception as e:
