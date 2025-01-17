@@ -6,6 +6,7 @@ from llama_extract import LlamaExtract, ExtractionAgent
 from dotenv import load_dotenv
 from collections import namedtuple
 import json
+import uuid
 from llama_cloud.core.api_error import ApiError
 from deepdiff import DeepDiff
 from tests.util import json_subset_match_score
@@ -90,7 +91,9 @@ def extractor():
 @pytest.fixture
 def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
     """Fixture to create and cleanup extraction agent for each test."""
-    agent_name = test_case.name
+    # Create unique name with random UUID (important for CI to avoid conflicts)
+    unique_id = uuid.uuid4().hex[:8]
+    agent_name = f"{test_case.name}_{unique_id}"
 
     with open(test_case.schema_path, "r") as f:
         schema = json.load(f)
@@ -120,17 +123,7 @@ def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
     reason="LLAMA_CLOUD_API_KEY not set",
 )
 @pytest.mark.parametrize("test_case", get_test_cases(), ids=lambda x: x.name)
-def test_extraction(
-    test_case: TestCase, extraction_agent: ExtractionAgent, extractor: LlamaExtract
-) -> None:
-    try:
-        extractor.get_agent(id=extraction_agent.id)
-    except ApiError as e:
-        if e.status_code == 404:
-            pytest.fail(
-                f"Agent {extraction_agent.id} was not found before test started. It may have been deleted prematurely."
-            )
-        raise
+def test_extraction(test_case: TestCase, extraction_agent: ExtractionAgent) -> None:
     result = extraction_agent.extract(test_case.input_file).data
     with open(test_case.expected_output, "r") as f:
         expected = json.load(f)

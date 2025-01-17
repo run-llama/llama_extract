@@ -60,43 +60,40 @@ def test_schema_dict():
 @pytest.fixture
 def test_agent(llama_extract, test_agent_name, test_schema_dict, request):
     """Creates a test agent and cleans it up after the test"""
-    # Create a unique name for this test
     test_id = request.node.nodeid
-    test_hash = hex(hash(test_id))[-8:]  # Use last 8 chars of hash for uniqueness
+    test_hash = hex(hash(test_id))[-8:]
     base_name = test_agent_name
 
-    # Get custom values from markers if they exist
-    for marker in request.node.iter_markers("agent_name"):
-        base_name = marker.args[0]
-
-    # Create unique name by combining base name and short hash
+    base_name = next(
+        (marker.args[0] for marker in request.node.iter_markers("agent_name")),
+        base_name,
+    )
     name = f"{base_name}_{test_hash}"
-    schema = test_schema_dict
 
-    for marker in request.node.iter_markers("agent_schema"):
-        schema = (
+    schema = next(
+        (
             marker.args[0][0] if isinstance(marker.args[0], tuple) else marker.args[0]
-        )
+            for marker in request.node.iter_markers("agent_schema")
+        ),
+        test_schema_dict,
+    )
 
-    # Clean up any existing agent before creating new one
+    # Cleanup existing agent
     try:
-        agents = llama_extract.list_agents()
-        for agent in agents:
+        for agent in llama_extract.list_agents():
             if agent.name == name:
                 llama_extract.delete_agent(agent.id)
     except Exception as e:
-        print(f"Warning: Failed to cleanup existing agent: {str(e)}")
+        print(f"Warning: Failed to cleanup existing agent: {e}")
 
-    # Create new agent
     agent = llama_extract.create_agent(name=name, data_schema=schema)
-
     yield agent
 
     # Cleanup after test
     try:
         llama_extract.delete_agent(agent.id)
     except Exception as e:
-        print(f"Warning: Failed to delete agent {agent.id}: {str(e)}")
+        print(f"Warning: Failed to delete agent {agent.id}: {e}")
 
 
 class TestLlamaExtract:
