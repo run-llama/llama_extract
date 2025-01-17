@@ -1,8 +1,10 @@
+from typing import Any
+
 from autoevals.string import Levenshtein
 from autoevals.number import NumericDiff
 
 
-def json_subset_match_score(expected, actual):
+def json_subset_match_score(expected: Any, actual: Any) -> float:
     """
     Adapted from autoevals.JsonDiff to only test on the subset of keys within the expected json.
     """

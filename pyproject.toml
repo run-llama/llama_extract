@@ -2,6 +2,10 @@
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.mypy]
+files = ["llama_extract"]
+python_version = "3.9"
+
 [tool.poetry]
 name = "llama-extract"
 version = "0.1.0"
