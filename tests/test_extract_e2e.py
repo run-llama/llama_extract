@@ -120,7 +120,9 @@ def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
     reason="LLAMA_CLOUD_API_KEY not set",
 )
 @pytest.mark.parametrize("test_case", get_test_cases(), ids=lambda x: x.name)
-def test_extraction(test_case: TestCase, extraction_agent: ExtractionAgent) -> None:
+def test_extraction(
+    test_case: TestCase, extraction_agent: ExtractionAgent, extractor: LlamaExtract
+) -> None:
     try:
         extractor.get_agent(id=extraction_agent.id)
     except ApiError as e:
