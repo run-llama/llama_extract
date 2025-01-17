@@ -82,22 +82,26 @@ def extraction_agent(test_case: TestCase):
         base_url=LLAMA_CLOUD_BASE_URL,
         project_id=LLAMA_CLOUD_PROJECT_ID,
     )
-    agent_name = test_case.name.split("/")[0]
+
+    agent_name = test_case.name
+
     with open(test_case.schema_path, "r") as f:
         schema = json.load(f)
 
+    # Clean up any existing agents with this name
     try:
-        existing_agent = extractor.get_agent(agent_name)
-        if existing_agent:
-            extractor.delete_agent(existing_agent.id)
-    except ApiError as e:
-        if e.status_code == 404:
-            pass
-        else:
-            raise
+        agents = extractor.list_agents()
+        for agent in agents:
+            if agent.name == agent_name:
+                extractor.delete_agent(agent.id)
+    except Exception as e:
+        print(f"Warning: Failed to cleanup existing agent: {str(e)}")
 
+    # Create new agent
     agent = extractor.create_agent(agent_name, schema)
-    yield agent  # Provide the agent to the test
+    yield agent
+
+    # Cleanup after test
     try:
         extractor.delete_agent(agent.id)
     except Exception as e:

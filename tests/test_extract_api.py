@@ -60,11 +60,17 @@ def test_schema_dict():
 @pytest.fixture
 def test_agent(llama_extract, test_agent_name, test_schema_dict, request):
     """Creates a test agent and cleans it up after the test"""
-    name = test_agent_name
-    schema = test_schema_dict
+    # Create a unique name for this test
+    test_id = request.node.nodeid.replace("/", "_").replace(":", "_").replace(".", "_")
+    base_name = test_agent_name
+
     # Get custom values from markers if they exist
     for marker in request.node.iter_markers("agent_name"):
-        name = marker.args[0]
+        base_name = marker.args[0]
+
+    # Create unique name by combining base name and test ID
+    name = f"{base_name}_{test_id}"
+    schema = test_schema_dict
 
     for marker in request.node.iter_markers("agent_schema"):
         schema = (
