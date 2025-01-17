@@ -86,7 +86,7 @@ schema = {
 agent = extractor.create_agent(name="resume-parser", data_schema=schema)
 ```
 
-## Advanced Usage
+## Other Extraction APIs
 
 ### Batch Processing
 
@@ -136,7 +136,7 @@ extractor.delete_agent(agent.id)
 pip install llama-extract==0.1.0
 ```
 
-## Best Practices 
+## Tips & Best Practices 
 
 1. **Schema Design**:
    - Make fields optional when data might not always be present.
