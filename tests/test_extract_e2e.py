@@ -74,14 +74,22 @@ def get_test_cases():
     return test_cases
 
 
-@pytest.fixture
-def extraction_agent(test_case: TestCase):
-    """Fixture to create and cleanup extraction agent for each test."""
-    extractor = LlamaExtract(
+@pytest.fixture(scope="session")
+def extractor():
+    """Create a single LlamaExtract instance for all tests."""
+    extract = LlamaExtract(
         api_key=LLAMA_CLOUD_API_KEY,
         base_url=LLAMA_CLOUD_BASE_URL,
         project_id=LLAMA_CLOUD_PROJECT_ID,
     )
+    yield extract
+    # Cleanup thread pool at end of session
+    extract._thread_pool.shutdown()
+
+
+@pytest.fixture
+def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
+    """Fixture to create and cleanup extraction agent for each test."""
 
     agent_name = test_case.name
 

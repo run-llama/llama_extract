@@ -19,6 +19,7 @@ from llama_cloud import (
     StatusEnum,
     Project,
 )
+from llama_cloud.core.api_error import ApiError
 from llama_cloud.client import AsyncLlamaCloud
 from llama_extract.utils import JSONObjectType, augment_async_errors
 from llama_index.core.schema import BaseComponent
@@ -517,19 +518,25 @@ class LlamaExtract(BaseComponent):
             )
 
         if id:
-            agent = self._run_in_thread(
+            agents = self._run_in_thread(
                 self._async_client.llama_extract.get_extraction_agent(
                     extraction_agent_id=id,
                 )
             )
+            if not agents:
+                raise ValueError(f"No agent found with id: {id}")
+            agent = agents[0]
 
         elif name:
-            agent = self._run_in_thread(
+            agents = self._run_in_thread(
                 self._async_client.llama_extract.list_extraction_agents(
                     project_id=self._project_id,
                     name=name,
                 )
-            )[0]
+            )
+            if not agents:
+                raise ValueError(f"No agent found with name: {name}")
+            agent = agents[0]
         else:
             raise ValueError("Either name or extraction_agent_id must be provided.")
 
