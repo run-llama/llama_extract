@@ -61,15 +61,16 @@ def test_schema_dict():
 def test_agent(llama_extract, test_agent_name, test_schema_dict, request):
     """Creates a test agent and cleans it up after the test"""
     # Create a unique name for this test
-    test_id = request.node.nodeid.replace("/", "_").replace(":", "_").replace(".", "_")
+    test_id = request.node.nodeid
+    test_hash = hex(hash(test_id))[-8:]  # Use last 8 chars of hash for uniqueness
     base_name = test_agent_name
 
     # Get custom values from markers if they exist
     for marker in request.node.iter_markers("agent_name"):
         base_name = marker.args[0]
 
-    # Create unique name by combining base name and test ID
-    name = f"{base_name}_{test_id}"
+    # Create unique name by combining base name and short hash
+    name = f"{base_name}_{test_hash}"
     schema = test_schema_dict
 
     for marker in request.node.iter_markers("agent_schema"):
