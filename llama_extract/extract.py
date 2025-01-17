@@ -518,14 +518,11 @@ class LlamaExtract(BaseComponent):
             )
 
         if id:
-            agents = self._run_in_thread(
+            return self._run_in_thread(
                 self._async_client.llama_extract.get_extraction_agent(
                     extraction_agent_id=id,
                 )
             )
-            if not agents:
-                raise ValueError(f"No agent found with id: {id}")
-            agent = agents[0]
 
         elif name:
             agents = self._run_in_thread(

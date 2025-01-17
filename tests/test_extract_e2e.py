@@ -90,7 +90,6 @@ def extractor():
 @pytest.fixture
 def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
     """Fixture to create and cleanup extraction agent for each test."""
-
     agent_name = test_case.name
 
     with open(test_case.schema_path, "r") as f:
@@ -122,6 +121,14 @@ def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
 )
 @pytest.mark.parametrize("test_case", get_test_cases(), ids=lambda x: x.name)
 def test_extraction(test_case: TestCase, extraction_agent: ExtractionAgent) -> None:
+    try:
+        extractor.get_agent(id=extraction_agent.id)
+    except ApiError as e:
+        if e.status_code == 404:
+            pytest.fail(
+                f"Agent {extraction_agent.id} was not found before test started. It may have been deleted prematurely."
+            )
+        raise
     result = extraction_agent.extract(test_case.input_file).data
     with open(test_case.expected_output, "r") as f:
         expected = json.load(f)
