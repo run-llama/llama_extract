@@ -1,6 +1,6 @@
 # LlamaExtract
 
-> **⚠️ EXPERIMENTAL**  
+> **⚠️ EXPERIMENTAL**
 > This library is under active development with frequent breaking changes. APIs and functionality may change significantly between versions. If you're interested in being an early adopter, please contact us at [support@llamaindex.ai](mailto:support@llamaindex.ai) or join our [Discord](https://discord.com/invite/eN6D2HQ4aX).
 
 LlamaExtract provides a simple API for extracting structured data from unstructured documents like PDFs, text files and images (upcoming).
@@ -14,17 +14,16 @@ from pydantic import BaseModel, Field
 # Initialize client
 extractor = LlamaExtract()
 
+
 # Define schema using Pydantic
 class Resume(BaseModel):
     name: str = Field(description="Full name of candidate")
     email: str = Field(description="Email address")
     skills: list[str] = Field(description="Technical skills and technologies")
 
+
 # Create extraction agent
-agent = extractor.create_agent(
-    name="resume-parser",
-    data_schema=Resume
-)
+agent = extractor.create_agent(name="resume-parser", data_schema=Resume)
 
 # Extract data from document
 result = agent.extract("resume.pdf")
@@ -47,11 +46,13 @@ Schemas can be defined using either Pydantic models or JSON Schema:
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+
 class Experience(BaseModel):
     company: str = Field(description="Company name")
     title: str = Field(description="Job title")
     start_date: Optional[str] = Field(description="Start date of employment")
     end_date: Optional[str] = Field(description="End date of employment")
+
 
 class Resume(BaseModel):
     name: str = Field(description="Candidate name")
@@ -64,10 +65,7 @@ class Resume(BaseModel):
 schema = {
     "type": "object",
     "properties": {
-        "name": {
-            "type": "string",
-            "description": "Candidate name"
-        },
+        "name": {"type": "string", "description": "Candidate name"},
         "experience": {
             "type": "array",
             "items": {
@@ -76,11 +74,11 @@ schema = {
                     "company": {"type": "string"},
                     "title": {"type": "string"},
                     "start_date": {"type": "string"},
-                    "end_date": {"type": "string"}
-                }
-            }
-        }
-    }
+                    "end_date": {"type": "string"},
+                },
+            },
+        },
+    },
 }
 
 agent = extractor.create_agent(name="resume-parser", data_schema=schema)
@@ -136,7 +134,7 @@ extractor.delete_agent(agent.id)
 pip install llama-extract==0.1.0
 ```
 
-## Tips & Best Practices 
+## Tips & Best Practices
 
 1. **Schema Design**:
    - Make fields optional when data might not always be present.
