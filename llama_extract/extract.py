@@ -519,8 +519,8 @@ class LlamaExtract(BaseComponent):
         elif name:
             agent = self._run_in_thread(
                 self._async_client.llama_extract.get_extraction_agent_by_name(
-                    project_id=self._project_id,
                     name=name,
+                    project_id=self._project_id,
                 )
             )
         else:
@@ -582,7 +582,7 @@ if __name__ == "__main__":
     data_dir = Path(__file__).parent.parent / "tests" / "data"
     extractor = LlamaExtract()
     try:
-        agent = extractor.get_extraction_agent(name="test-agent")
+        agent = extractor.get_agent(name="test-agent")
     except Exception:
         agent = extractor.create_agent(
             "test-agent",
