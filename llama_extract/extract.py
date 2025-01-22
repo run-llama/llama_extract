@@ -113,7 +113,12 @@ class ExtractionAgent:
             raise ValueError(
                 "data_schema must be either a dictionary or a Pydantic model"
             )
-        self._data_schema = processed_schema
+        validated_schema = self._run_in_thread(
+            self._client.llama_extract.validate_extraction_schema(
+                data_schema=processed_schema
+            )
+        )
+        self._data_schema = validated_schema.data_schema
 
     @property
     def config(self) -> ExtractConfig:
