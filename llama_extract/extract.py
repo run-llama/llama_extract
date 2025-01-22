@@ -156,12 +156,9 @@ class ExtractionAgent:
             )
 
             if job.status == StatusEnum.SUCCESS:
-                result = await self._client.llama_extract.list_extract_runs(
+                return await self._client.llama_extract.get_run_by_job_id(
                     job_id=job_id,
                 )
-                if not result:
-                    raise RuntimeError(f"No extraction runs found for job: {job_id}")
-                return result[0]
             elif job.status == StatusEnum.PENDING:
                 end = time.perf_counter()
                 if end - start > self.max_timeout:
@@ -173,10 +170,9 @@ class ExtractionAgent:
                 warnings.warn(
                     f"Failure in job: {job_id}, status: {job.status}, error: {job.error}"
                 )
-                result = await self._client.llama_extract.list_extract_runs(
+                return await self._client.llama_extract.get_run_by_job_id(
                     job_id=job_id,
                 )
-                return result[0] if result else None
 
     def save(self) -> None:
         """Persist the extraction agent's schema and config to the database.
@@ -317,15 +313,11 @@ class ExtractionAgent:
         Returns:
             ExtractRun: The extraction run
         """
-        run = self._run_in_thread(
-            self._client.llama_extract.list_extract_runs(
-                extraction_agent_id=self.id,
+        return self._run_in_thread(
+            self._client.llama_extract.get_run_by_job_id(
                 job_id=job_id,
             )
         )
-        if not run:
-            raise ValueError(f"No extraction run found for job: {job_id}")
-        return run[0]
 
     def list_extraction_runs(self) -> List[ExtractRun]:
         """List extraction runs for the extraction agent.
@@ -525,15 +517,12 @@ class LlamaExtract(BaseComponent):
             )
 
         elif name:
-            agents = self._run_in_thread(
-                self._async_client.llama_extract.list_extraction_agents(
-                    project_id=self._project_id,
+            agent = self._run_in_thread(
+                self._async_client.llama_extract.get_extraction_agent_by_name(
                     name=name,
+                    project_id=self._project_id,
                 )
             )
-            if not agents:
-                raise ValueError(f"No agent found with name: {name}")
-            agent = agents[0]
         else:
             raise ValueError("Either name or extraction_agent_id must be provided.")
 
@@ -593,7 +582,7 @@ if __name__ == "__main__":
     data_dir = Path(__file__).parent.parent / "tests" / "data"
     extractor = LlamaExtract()
     try:
-        agent = extractor.get_extraction_agent(name="test-agent")
+        agent = extractor.get_agent(name="test-agent")
     except Exception:
         agent = extractor.create_agent(
             "test-agent",
