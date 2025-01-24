@@ -38,6 +38,7 @@ def llama_extract():
         api_key=LLAMA_CLOUD_API_KEY,
         base_url=LLAMA_CLOUD_BASE_URL,
         project_id=LLAMA_CLOUD_PROJECT_ID,
+        verbose=True,
     )
 
 

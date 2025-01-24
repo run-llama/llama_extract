@@ -19,7 +19,6 @@ from llama_cloud import (
     StatusEnum,
     Project,
 )
-from llama_cloud.core.api_error import ApiError
 from llama_cloud.client import AsyncLlamaCloud
 from llama_extract.utils import JSONObjectType, augment_async_errors
 from llama_index.core.schema import BaseComponent
@@ -242,7 +241,7 @@ class ExtractionAgent:
             )
 
         if self._verbose:
-            for file, job in zip(files, results):
+            for file, job in zip(files, extract_jobs):
                 file_repr = (
                     str(file) if isinstance(file, (str, Path)) else "<bytes/buffer>"
                 )
