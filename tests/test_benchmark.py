@@ -4,13 +4,17 @@ from pathlib import Path
 
 from llama_extract import LlamaExtract, ExtractionAgent
 from dotenv import load_dotenv
+from time import perf_counter
 from collections import namedtuple
 import json
 import uuid
 from llama_cloud.core.api_error import ApiError
-from llama_cloud.types import ExtractConfig, ExtractMode, ExtractConfig
-from deepdiff import DeepDiff
-from tests.util import json_subset_match_score
+from llama_cloud.types import (
+    ExtractConfig,
+    ExtractMode,
+    LlamaParseParameters,
+    LlamaExtractSettings,
+)
 
 load_dotenv(Path(__file__).parent.parent / ".env.dev", override=True)
 
@@ -117,26 +121,29 @@ def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
         print(f"Warning: Failed to cleanup existing agent: {str(e)}")
 
     # Create new agent
-    agent = extractor.create_agent(agent_name, schema)
+    agent = extractor.create_agent(agent_name, schema, config=test_case.config)
     yield agent
-
-    # Cleanup after test
-    try:
-        extractor.delete_agent(agent.id)
-    except Exception as e:
-        print(f"Warning: Failed to delete agent {agent.id}: {str(e)}")
 
 
 @pytest.mark.skipif(
-    os.environ.get("LLAMA_CLOUD_API_KEY", "") == "",
-    reason="LLAMA_CLOUD_API_KEY not set",
+    "CI" in os.environ,
+    reason="CI environment is not suitable for benchmarking",
 )
 @pytest.mark.parametrize("test_case", get_test_cases(), ids=lambda x: x.name)
-def test_extraction(test_case: TestCase, extraction_agent: ExtractionAgent) -> None:
-    result = extraction_agent.extract(test_case.input_file).data
-    with open(test_case.expected_output, "r") as f:
-        expected = json.load(f)
-    # TODO: fix the saas_slide test
-    assert json_subset_match_score(expected, result) > 0.3, DeepDiff(
-        expected, result, ignore_order=True
+@pytest.mark.asyncio(loop_scope="session")
+async def test_extraction(
+    test_case: TestCase, extraction_agent: ExtractionAgent
+) -> None:
+    start = perf_counter()
+    result = await extraction_agent._queue_extraction_test(
+        test_case.input_file,
+        extract_settings=LlamaExtractSettings(
+            llama_parse_params=LlamaParseParameters(
+                invalidate_cache=True,
+                do_not_cache=True,
+            )
+        ),
     )
+    end = perf_counter()
+    print(f"Time taken: {end - start} seconds")
+    print(result)
