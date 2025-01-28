@@ -117,7 +117,7 @@ def extraction_agent(test_case: TestCase, extractor: LlamaExtract):
         print(f"Warning: Failed to cleanup existing agent: {str(e)}")
 
     # Create new agent
-    agent = extractor.create_agent(agent_name, schema)
+    agent = extractor.create_agent(agent_name, schema, config=test_case.config)
     yield agent
 
     # Cleanup after test
