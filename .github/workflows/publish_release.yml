@@ -37,7 +37,7 @@ jobs:
               const runs = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'unit_testing.yml',
+                workflow_id: 'unit_test.yml',
                 status: 'completed',
                 branch: 'main'
               });
