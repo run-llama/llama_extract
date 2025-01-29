@@ -1,15 +1,23 @@
 name: Publish Release
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Unit Testing"]
+    types:
+      - completed
     tags:
       - "v*"
   workflow_dispatch:
 
 jobs:
   publish:
+    if: |
+      github.repository == 'run-llama/llama_extract' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.name == 'Unit Testing' &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
-    if: github.repository == 'run-llama/llama_extract'
     steps:
       - uses: actions/checkout@v4
 
