@@ -21,7 +21,7 @@ jobs:
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'unit_testing.yml',
+              workflow_id: 'unit_test.yml',
               ref: context.sha
             });
 
@@ -36,7 +36,7 @@ jobs:
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'unit_testing.yml',
+              workflow_id: 'unit_test.yml',
               status: 'completed',
               head_sha: context.sha
             });
