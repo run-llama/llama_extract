@@ -22,7 +22,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'unit_test.yml',
-              ref: context.sha
+              ref: 'main'
             });
 
       - name: Wait for tests
@@ -38,7 +38,7 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'unit_test.yml',
               status: 'completed',
-              head_sha: context.sha
+              branch: 'main'
             });
 
             if(runs.data.workflow_runs.length > 0) {
