@@ -30,27 +30,32 @@ jobs:
         with:
           script: |
             const TIMEOUT = 600000;  // 10 minutes in milliseconds
-            console.log('Waiting for tests to complete...');
-            await new Promise(r => setTimeout(r, TIMEOUT));
+            const START_TIME = Date.now();
 
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'unit_test.yml',
-              status: 'completed',
-              branch: 'main'
-            });
+            while (Date.now() - START_TIME < TIMEOUT) {
+              console.log('Checking test status...');
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'unit_testing.yml',
+                status: 'completed',
+                branch: 'main'
+              });
 
-            if(runs.data.workflow_runs.length > 0) {
-              const run = runs.data.workflow_runs[0];
-              if(run.conclusion === 'success') {
-                console.log('Tests passed!');
-              } else {
-                throw new Error('Tests failed!');
+              if(runs.data.workflow_runs.length > 0) {
+                const run = runs.data.workflow_runs[0];
+                if(run.conclusion === 'success') {
+                  console.log('Tests passed!');
+                  return;
+                } else if(run.conclusion === 'failure') {
+                  throw new Error('Tests failed!');
+                }
               }
-            } else {
-              throw new Error('Tests did not complete within 10 minutes');
+
+              console.log('...');
+              await new Promise(r => setTimeout(r, 30000));  // Wait 30 seconds between checks
             }
+            throw new Error('Tests did not complete within 10 minutes');
       - uses: actions/checkout@v4
 
       - name: Set up Python

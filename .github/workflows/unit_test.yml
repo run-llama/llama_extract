@@ -15,7 +15,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && 'CI-prod' || 'CI-staging' }}
+    environment: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && 'CI-prod' || 'CI-staging' }}
     strategy:
       # You can use PyPy versions in python-version.
       # For example, pypy-2.7 and pypy-3.8
