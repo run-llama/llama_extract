@@ -8,7 +8,7 @@ python_version = "3.9"
 
 [tool.poetry]
 name = "llama-extract"
-version = "0.1.0"
+version = "0.1.1"
 description = "Structured data extraction from files."
 authors = ["Logan Markewich <logan@runllama.ai>", "Neeraj Pradhan <neeraj@llamaindex.ai>"]
 license = "MIT"
