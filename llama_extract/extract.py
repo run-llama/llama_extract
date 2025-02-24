@@ -229,7 +229,7 @@ class ExtractionAgent:
             extract_jobs = await run_jobs(
                 job_tasks,
                 workers=self.num_workers,
-                desc="Creating extraction jobs",
+                desc="Running extraction jobs",
                 show_progress=self.show_progress,
             )
 
