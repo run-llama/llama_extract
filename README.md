@@ -1,7 +1,7 @@
 # LlamaExtract
 
-> **⚠️ EXPERIMENTAL**
-> This library is under active development with frequent breaking changes. APIs and functionality may change significantly between versions. If you're interested in being an early adopter, please contact us at [support@llamaindex.ai](mailto:support@llamaindex.ai) or join our [Discord](https://discord.com/invite/eN6D2HQ4aX).
+> ⚠️ This project has been moved to [LlamaCloud Services](https://github.com/run-llama/llama_cloud_services/)
+> --------
 
 LlamaExtract provides a simple API for extracting structured data from unstructured documents like PDFs, text files and images (upcoming).
 
