@@ -1,13 +1,20 @@
-# LlamaExtract
+<div align="center">
+  <h1>⚠️ REPOSITORY MOVED ⚠️</h1>
+  <h2>This project has been moved to <a href="https://github.com/run-llama/llama_cloud_services/">LlamaCloud Services</a></h2>
+  <h3>Please update your bookmarks and repositories accordingly</h3>
+  <hr style="border: 2px solid red;" />
+</div>
 
-> ⚠️ This project has been moved to [LlamaCloud Services](https://github.com/run-llama/llama_cloud_services/)
-> --------
+# LlamaExtract
 
 LlamaExtract provides a simple API for extracting structured data from unstructured documents like PDFs, text files and images (upcoming).
 
 ## Quick Start
 
 ```python
+# Repository moved to LlamaCloud Services
+# Please see notice above for more information
+
 from llama_extract import LlamaExtract
 from pydantic import BaseModel, Field
 
@@ -43,6 +50,9 @@ Schemas can be defined using either Pydantic models or JSON Schema:
 ### Using Pydantic (Recommended)
 
 ```python
+# Repository moved to LlamaCloud Services
+# Please see notice above for more information
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -62,6 +72,9 @@ class Resume(BaseModel):
 ### Using JSON Schema
 
 ```python
+# Repository moved to LlamaCloud Services
+# Please see notice above for more information
+
 schema = {
     "type": "object",
     "properties": {
@@ -117,6 +130,9 @@ be sufficient for a wide variety of use-cases.
 Process multiple files asynchronously:
 
 ```python
+# Repository moved to LlamaCloud Services
+# Please see notice above for more information
+
 # Queue multiple files for extraction
 jobs = await agent.queue_extraction(["resume1.pdf", "resume2.pdf"])
 
