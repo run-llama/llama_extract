@@ -5,6 +5,8 @@
   <hr style="border: 2px solid red;" />
 </div>
 
+<!-- Original README content below -->
+
 # LlamaExtract
 
 LlamaExtract provides a simple API for extracting structured data from unstructured documents like PDFs, text files and images (upcoming).
@@ -173,6 +175,9 @@ extractor.delete_agent(agent.id)
 ## Installation
 
 ```bash
+# Repository moved to LlamaCloud Services
+# Use pip install llama-cloud-services
+
 pip install llama-extract==0.1.0
 ```
 
